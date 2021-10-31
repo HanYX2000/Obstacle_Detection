@@ -1,0 +1,15 @@
+L1: -60.0
+L2: 60.0
+W1: -40.0
+W2: 40.0
+H1: -2.6
+H2: 0.2
+resolution: 0.5
+height_diff: 0.50
+
+ego_left: 1.2
+ego_right: -1.1
+ego_front: 2.9
+ego_back: -1.8
+ego_top: 0.3
+ego_bottom: -2.1

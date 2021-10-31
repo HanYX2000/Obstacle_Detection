@@ -1,0 +1,4 @@
+<launch>
+	<rosparam file="$(find lidar_perception)/config/ogm.yaml" command="load" ns="ogm" />
+	<node pkg="lidar_perception" name="ogm_node" type="ogm_node" output="screen" />
+</launch>
