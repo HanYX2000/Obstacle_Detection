@@ -11,6 +11,7 @@ Windows Python 2.7 version: https://github.com/AlexeyAB/darknet/blob/fc496d52bf2
 @date: 20180911
 """
 # pylint: disable=R, W0401, W0614, W0703
+from types import new_class
 import cv2
 import pyzed.sl as sl
 from ctypes import *
@@ -23,6 +24,7 @@ import sys
 import getopt
 from random import randint
 import rospy
+import yaml
 
 from geometry_msgs.msg import PoseArray
 from geometry_msgs.msg import Pose
@@ -413,6 +415,12 @@ def main(argv):
             all_ped_pose.header.frame_id = "cam_ped"
             all_ped_pose.header.stamp = rospy.Time.now()
 
+            #读入外参矩阵
+            with open("calibration.yaml", "r", encoding="utf-8") as f:
+                message = yaml.load(f.read(), Loader=yaml.Loader)
+                ExtrinctMat = message['CameraExtrinctMat']['data']
+                ExtrinctMat = ExtrinctMat.reshape((4,4))
+
             for detection in detections:
                 label = detection[0]
                 confidence = detection[1]
@@ -424,22 +432,29 @@ def main(argv):
                 # Coordinates are around the center
                 xCoord = int(bounds[0] - bounds[2]/2)
                 yCoord = int(bounds[1] - bounds[3]/2)
-                boundingBox = [ [xCoord, yCoord], [xCoord, yCoord + yExtent], [xCoord + xEntent, yCoord + yExtent], [xCoord + xEntent, yCoord] ]
+                boundingBox = [[xCoord, yCoord], [xCoord, yCoord + yExtent], [xCoord + xEntent, yCoord + yExtent], [xCoord + xEntent, yCoord]]
                 thickness = 1
                 x, y, z = getObjectDepth(depth, bounds)
+                
                 distance = math.sqrt(x * x + y * y + z * z)
                 distance = "{:.2f}".format(distance)
                 cv2.rectangle(image, (xCoord-thickness, yCoord-thickness), (xCoord + xEntent+thickness, yCoord+(18 +thickness*4)), color_array[detection[3]], -1)
                 cv2.putText(image, label + " " +  (str(distance) + " m"), (xCoord+(thickness*4), yCoord+(10 +thickness*4)), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 2)
                 cv2.rectangle(image, (xCoord-thickness, yCoord-thickness), (xCoord + xEntent+thickness, yCoord + yExtent+thickness), color_array[detection[3]], int(thickness*2))
-
+                
+                #坐标变换矩阵转换
+                position = [[x], [y], [z], [1]]
+                new_position = np.multiply(ExtrinctMat, position)
+                
                 #将检测结果为人的部分通过ros发出去
                 if (label == "person"):
                     ped_pose = Pose()
-                    ped_pose.position.x = bounds[1]
-                    ped_pose.position.y = bounds[0]
+                    # ped_pose.position.x = bounds[1]
+                    # ped_pose.position.y = bounds[0]
+                    ped_pose.position.x = new_position[1][0]
+                    ped_pose.position.y = new_position[0][0]
                     ped_pose.position.z += 1
-                    ped_pose.orientation.x = distance
+                    ped_pose.orientation.x = new_position[2][0]
                     ped_pose.orientation.y = bounds[3]
                     ped_pose.orientation.z = bounds[2]
                     ped_pose.orientation.w = math.atan(bounds[1]/bounds[0])
